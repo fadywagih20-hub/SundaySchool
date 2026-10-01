@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>خدمة مدارس الأحد</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Reem+Kufi:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<section id="auth">
+  <div class="float" id="float"></div>
+  <div class="auth-card">
+    <div class="logo"><i class="ic" data-ic="cross"></i></div>
+    <h1>مدارس الأحد</h1>
+    <p class="verse">«أنا هو الطريق والحق والحياة» <small>يو ١٤: ٦</small></p>
+    <input id="email" type="email" placeholder="البريد الإلكتروني" autocomplete="email">
+    <input id="pass" type="password" placeholder="كلمة المرور (٦ أحرف على الأقل)" autocomplete="current-password">
+    <button class="btn primary" id="authBtn">تسجيل الدخول</button>
+    <button class="btn ghost" id="googleBtn">الدخول بحساب Google</button>
+    <a href="#" id="toggleAuth">ليس لديك حساب؟ أنشئ حساباً جديداً</a>
+    <p class="err" id="authErr"></p>
+    <p class="muted small" id="demoNote"></p>
+  </div>
+</section>
+
+<div id="app" hidden>
+  <aside>
+    <div class="brand"><i class="ic" data-ic="cross"></i><span>مدارس الأحد</span></div>
+    <nav>
+      <button data-v="track" class="on"><i class="ic" data-ic="church"></i><span>المتابعة</span></button>
+      <button data-v="board"><i class="ic" data-ic="crown"></i><span>لوحة الشرف</span></button>
+      <button data-v="kids"><i class="ic" data-ic="book"></i><span>المخدومين</span></button>
+    </nav>
+    <p class="aside-verse">«كُلُّ شَيْءٍ يَحْسُنُ وَبِحَسَبِ تَرْتِيبٍ»</p>
+    <button class="out" id="logout"><i class="ic" data-ic="out"></i><span>خروج</span></button>
+  </aside>
+  <main>
+    <header>
+      <h2 id="title">المتابعة الأسبوعية</h2>
+      <div class="tools">
+        <input id="search" placeholder="بحث بالاسم">
+        <select id="year"></select>
+        <button class="btn primary" id="addKid">＋ ولد جديد</button>
+        <button class="btn ghost" id="csv">تصدير Excel</button>
+      </div>
+    </header>
+    <section id="stats"></section>
+    <section id="v-track" class="view">
+      <div class="months" id="months"></div>
+      <div class="legend" id="legend"></div>
+      <div class="scroll"><table id="tbl"></table></div>
+    </section>
+    <section id="v-board" class="view" hidden><div id="podium"></div><div class="scroll"><table id="rank"></table></div></section>
+    <section id="v-kids" class="view" hidden><div id="grid"></div></section>
+  </main>
+</div>
+
+<dialog id="dlg">
+  <form method="dialog" id="kidForm">
+    <div class="dhead"><h3 id="dTitle">بطاقة المخدوم</h3><button type="button" class="x" id="closeDlg">✕</button></div>
+    <div class="dbody">
+      <label class="photo"><img id="pPrev" alt=""><span>تغيير الصورة</span><input type="file" id="pFile" accept="image/*" hidden></label>
+      <div class="fields">
+        <label>الاسم<input name="name" required></label>
+        <label>تاريخ الميلاد<input name="birth" type="date"></label>
+        <label>السنة الدراسية<input name="grade"></label>
+        <label>هاتف الأب<input name="phoneF" type="tel"></label>
+        <label>هاتف الأم<input name="phoneM" type="tel"></label>
+        <label>العنوان<input name="address"></label>
+        <label>أب اعتراف الأب<input name="confF"></label>
+        <label>أب اعتراف الأم<input name="confM"></label>
+        <label>أب اعتراف الولد<input name="confS"></label>
+        <label class="full">ملاحظات خادم الفصل (سلوكية / صحية)<textarea name="notes" rows="3"></textarea></label>
+      </div>
+    </div>
+    <div class="dfoot"><button class="btn danger" type="button" id="delKid">حذف</button><button class="btn primary" value="save">حفظ البطاقة</button></div>
+  </form>
+</dialog>
+<div id="toast"></div>
+<script src="script.js" defer></script>
+</body>
+</html>
