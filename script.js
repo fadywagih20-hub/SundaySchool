@@ -1,6 +1,11 @@
 
 /* ====== 1) ضع إعدادات مشروع Firebase هنا (Project settings > Web app) ====== */
-const firebaseConfig = { apiKey: "", authDomain: "", projectId: "", appId: "" };
+const firebaseConfig = {
+  apiKey: "AIzaSyBMUyY6a3EVUgQAEBFJtuuXsCLy7z-5hA0",
+  authDomain: "sunday-school-4c80b.firebaseapp.com",
+  projectId: "sunday-school-4c80b",
+  appId: "1:579717155944:web:0595e36c3154229b67bfdd"
+};
 /* ========================================================================= */
 
 const LIVE = !!firebaseConfig.apiKey;
@@ -18,14 +23,27 @@ year = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
 /* ---------- طبقة البيانات: Firebase أو تخزين محلي تجريبي ---------- */
 let auth, db, col, unsub, fb = {};
 const LS = "ss_kids";
+const HOST = "kerolloesatef7@gmail.com", PW = 4468333679990479;
+const h53 = (str, seed = 0) => { let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed; for (let i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507); h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507); h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909); return 4294967296 * (2097151 & h2) + (h1 >>> 0); };
+const LBL = { m: "القداس", t: "التونية", s: "الخدمة", b: "البونص" };
+let userEmail = "", logs = [], unsubLog;
+const me = () => LIVE ? (auth?.currentUser?.email || "") : (localStorage.getItem("ss_user") || "");
+const isHost = () => userEmail.toLowerCase() === HOST;
+const when = t => t ? new Date(t).toLocaleString("ar-EG", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+const dateLabel = k => new Date(+k.slice(1, 5), +k.slice(5, 7) - 1, +k.slice(7)).toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" });
 const store = {
   async save(k) { LIVE ? await fb.setDoc(fb.doc(col, k.id), k, { merge: true }) : (local(k.id, k), emit()); },
   async remove(id) { LIVE ? await fb.deleteDoc(fb.doc(col, id)) : (kids = kids.filter(x => x.id !== id), persist(), emit()); },
   async setAtt(id, key, f, v) {
-    const k = kids.find(x => x.id === id);
-    if (LIVE) return fb.setDoc(fb.doc(col, id), { att: { [key]: { [f]: v } } }, { merge: true });
-    ((k.att ??= {})[key] ??= {})[f] = v; persist(); emit();
-  }
+    const k = kids.find(x => x.id === id), old = k.att?.[key]?.[f] ?? 0; if (old == v) return;
+    const meta = { by: userEmail, at: Date.now() };
+    if (LIVE) await fb.setDoc(fb.doc(col, id), { att: { [key]: { [f]: v, ...meta } }, lastBy: meta.by, lastAt: meta.at }, { merge: true });
+    else { ((k.att ??= {})[key] ??= {})[f] = v; Object.assign(k.att[key], meta); k.lastBy = meta.by; k.lastAt = meta.at; persist(); emit(); }
+    store.log("att", k, `${LBL[f]}: ${old | 0} ← ${v} (${dateLabel(key)})`);
+  },
+  log(type, k, detail) { const e = { email: userEmail, ts: Date.now(), type, kid: k.name, kidId: k.id, detail };
+    if (LIVE) fb.addDoc(fb.collection(db, "logs"), e).catch(() => {});
+    else { const L = JSON.parse(localStorage.getItem("ss_logs") || "[]"); L.unshift(e); localStorage.setItem("ss_logs", JSON.stringify(L.slice(0, 500))); if (isHost()) { logs = L; renderLog(); } } }
 };
 const persist = () => localStorage.setItem(LS, JSON.stringify(kids));
 const local = (id, k) => { const i = kids.findIndex(x => x.id === id); i < 0 ? kids.push(k) : kids[i] = { ...kids[i], ...k }; persist(); };
@@ -50,7 +68,7 @@ if (LIVE) {
   if (localStorage.getItem("ss_user")) enter();
 }
 function enter() { if (!$("#app").hidden) return; $("#auth").classList.add("leave");
-  setTimeout(() => { $("#auth").hidden = true; $("#app").hidden = false; $("#app").classList.add("in"); renderAll(); play($("#v-track")); play($("#stats")); confetti(24); }, 450); }
+  setTimeout(() => { userEmail = me(); setupHost(); $("#auth").hidden = true; $("#app").hidden = false; $("#app").classList.add("in"); renderAll(); play($("#v-track")); play($("#stats")); confetti(24); }, 450); }
 
 /* ---------- تسجيل الدخول / إنشاء حساب ---------- */
 const errMsg = c => ({ "auth/invalid-credential": "بيانات الدخول غير صحيحة", "auth/email-already-in-use": "هذا البريد مسجّل بالفعل", "auth/weak-password": "كلمة المرور ضعيفة", "auth/invalid-email": "بريد غير صالح", "net": "تعذر الاتصال بـ Firebase — تأكد من الإعدادات وشغّل من سيرفر" }[c] || "حدث خطأ، حاول مجدداً");
@@ -64,7 +82,7 @@ $("#authBtn").onclick = async () => {
   try { if (!auth) throw { code: "net" }; await fb[mode === "login" ? "signInWithEmailAndPassword" : "createUserWithEmailAndPassword"](auth, em, pw); }
   catch (e) { $("#authErr").textContent = errMsg(e.code); }
 };
-$("#googleBtn").onclick = async () => { if (!LIVE) { localStorage.setItem("ss_user", "demo"); return enter(); }
+$("#googleBtn").onclick = async () => { if (!LIVE) { localStorage.setItem("ss_user", "demo@local"); return enter(); }
   try { if (!auth) throw { code: "net" }; await fb.signInWithPopup(auth, new fb.GoogleAuthProvider()); } catch (e) { $("#authErr").textContent = errMsg(e.code); } };
 $("#logout").onclick = () => LIVE ? fb.signOut(auth) : (localStorage.removeItem("ss_user"), location.reload());
 
@@ -88,14 +106,14 @@ function renderAll() {
   $("#year").innerHTML = [year - 1, year, year + 1].map(y => `<option value="${y}" ${y === year ? "selected" : ""}>${y} / ${y + 1}</option>`).join("");
   const R = ranked(), top = R[0], pr = passed().length;
   $("#stats").innerHTML = `<div class="st">المخدومين<b>${R.length}</b></div><div class="st">الجمع المسجلة<b>${pr}</b></div><div class="st">الأول حالياً<b>${top ? esc(top.name.split(" ")[0]) : "-"}</b></div><div class="st">أعياد ميلاد الشهر<b>${kids.filter(k => k.birth && new Date(k.birth).getMonth() === now.getMonth()).length}</b></div>`;
-  renderTrack(R); renderBoard(R); renderKids(R);
+  renderTrack(R); renderBoard(R); renderKids(R); renderLog();
 }
 function renderTrack(R) {
   const ms = svcMonths(); $("#months").innerHTML = ms.map(({ m, y }, i) => `<button class="${i === monthIdx ? "on" : ""}" data-i="${i}">${MONTHS[m]} ${y}</button>`).join("");
   const { m, y } = ms[monthIdx], F = fridays(y, m), list = filt([...kids].sort((a, b) => a.name.localeCompare(b.name, "ar")));
   let h = `<thead><tr><th class="nm" rowspan="2">الاسم</th>${F.map(d => `<th colspan="5" class="day">${d.getDate()} ${MONTHS[m]}</th>`).join("")}<th rowspan="2">إجمالي الشهر</th></tr><tr>${F.map(() => FIELDS.map(f => `<th title="${f[3]}">${I(f[1])}</th>`).join("") + "<th>" + I("star") + "</th><th>Σ</th>").join("")}</tr></thead><tbody>`;
   h += list.map((k, idx) => { let mt = 0; const cells = F.map(d => { const a = k.att?.[key(d)] || {}, t = dayTotal(a); mt += t;
-    return FIELDS.map(([f, ic, c]) => `<td${f === "m" ? ' class="day"' : ""}><button class="t ${c} ${a[f] ? "on" : ""}" data-id="${k.id}" data-k="${key(d)}" data-f="${f}">${a[f] ? 1 : 0}</button></td>`).join("") + `<td><input class="b" type="number" min="0" value="${a.b || 0}" data-id="${k.id}" data-k="${key(d)}" data-f="b"></td><td class="tot">${t}</td>`; }).join("");
+    return FIELDS.map(([f, ic, c]) => `<td${f === "m" ? ' class="day"' : ""}><button class="t ${c} ${a[f] ? "on" : ""}" title="${a.by ? "آخر تعديل: " + esc(a.by) + " — " + when(a.at) : ""}" data-id="${k.id}" data-k="${key(d)}" data-f="${f}">${a[f] ? 1 : 0}</button></td>`).join("") + `<td><input class="b" type="number" min="0" value="${a.b || 0}" data-id="${k.id}" data-k="${key(d)}" data-f="b"></td><td class="tot">${t}</td>`; }).join("");
     return `<tr style="--i:${idx}"><td class="nm" data-open="${k.id}"><img class="av" src="${k.photo || AVATAR}">${esc(k.name)}</td>${cells}<td class="tot">${mt}</td></tr>`; }).join("");
   $("#tbl").innerHTML = h + (list.length ? "" : `<tr><td colspan="9" class="muted">لا يوجد مخدومين — اضغط «ولد جديد»</td></tr>`) + "</tbody>";
 }
@@ -106,7 +124,7 @@ function renderBoard(R) {
     filt(R).map((k, i) => `<tr style="--i:${i}"><td class="rk">${k.rank <= 3 ? `<span class="medal m${k.rank}">${k.rank}</span>` : k.rank}</td><td class="nm" data-open="${k.id}"><img class="av" src="${k.photo || AVATAR}">${esc(k.name)}</td><td class="tot">${k.pts}</td><td>${bar(k.m, "#2ecc8f")}</td><td>${bar(k.t, "#4aa8ff")}</td><td>${bar(k.s, "#b57bff")}</td></tr>`).join("") + "</tbody>";
 }
 function renderKids(R) {
-  $("#grid").innerHTML = filt(R).map(k => `<div class="kc" data-open="${k.id}"><img src="${k.photo || AVATAR}"><b>${esc(k.name)}</b><small>${esc(k.grade || "—")}</small><small>📞 ${esc(k.phoneF || k.phoneM || "—")}</small></div>`).join("");
+  $("#grid").innerHTML = filt(R).map(k => `<div class="kc" data-open="${k.id}"><img src="${k.photo || AVATAR}"><b>${esc(k.name)}</b><small>${esc(k.grade || "—")}</small><small>📞 ${esc(k.phoneS || k.phoneF || k.phoneM || "—")}</small></div>`).join("");
 }
 
 /* ---------- التفاعلات ---------- */
@@ -116,16 +134,16 @@ document.addEventListener("click", e => {
   const o = e.target.closest("[data-open]"); if (o && (e.detail === 2 || o.classList.contains("kc") || o.closest("#rank"))) openKid(o.dataset.open);
 });
 document.addEventListener("change", e => { const i = e.target.closest("input.b"); if (i) store.setAtt(i.dataset.id, i.dataset.k, "b", Math.max(0, +i.value || 0)); });
-$$("aside nav button").forEach(b => b.onclick = () => { view = b.dataset.v; $$("aside nav button").forEach(x => x.classList.toggle("on", x === b)); $$(".view").forEach(v => v.hidden = v.id !== "v-" + view); $("#title").textContent = { track: "المتابعة الأسبوعية", board: "لوحة الشرف والمراكز", kids: "بطاقات المخدومين" }[view]; });
+$$("aside nav button").forEach(b => b.onclick = () => { view = b.dataset.v; $$("aside nav button").forEach(x => x.classList.toggle("on", x === b)); $$(".view").forEach(v => v.hidden = v.id !== "v-" + view); $("#title").textContent = { track: "المتابعة الأسبوعية", board: "لوحة الشرف والمراكز", kids: "بطاقات المخدومين", log: "سجل النشاط" }[view]; });
 $$("aside nav button").forEach(b => b.addEventListener("click", () => { play($("#v-" + b.dataset.v)); play($("#stats")); if (b.dataset.v === "board") confetti(26); }));
 $("#search").oninput = e => { q = e.target.value.trim(); renderAll(); };
 $("#year").onchange = e => { year = +e.target.value; monthIdx = 0; renderAll(); };
-$("#addKid").onclick = () => openKid(null);
+$("#addKid").onclick = async () => { if (await askPw("إضافة مخدوم جديد تحتاج كلمة السر")) openKid(null); };
 
 const dlg = $("#dlg"), form = $("#kidForm");
 function openKid(id) {
   editId = id; const k = kids.find(x => x.id === id) || {}; photoData = k.photo || "";
-  $("#dTitle").textContent = id ? "بطاقة: " + k.name : "إضافة مخدوم جديد"; $("#delKid").hidden = !id; $("#pPrev").src = photoData || AVATAR;
+  $("#dTitle").textContent = id ? "بطاقة: " + k.name : "إضافة مخدوم جديد"; $("#delKid").hidden = !id || !isHost(); $("#lastEd").textContent = k.lastBy ? "آخر تعديل: " + k.lastBy + " — " + when(k.lastAt) : ""; $("#pPrev").src = photoData || AVATAR;
   [...form.elements].forEach(el => { if (el.name) el.value = k[el.name] || ""; }); dlg.showModal();
 }
 $("#closeDlg").onclick = () => dlg.close();
@@ -134,9 +152,15 @@ $("#pFile").onchange = e => { const f = e.target.files[0]; if (!f) return; const
   c.getContext("2d").drawImage(img, (220 - img.width * s) / 2, (220 - img.height * s) / 2, img.width * s, img.height * s);
   photoData = c.toDataURL("image/jpeg", .75); $("#pPrev").src = photoData; }; img.src = URL.createObjectURL(f); };
 form.onsubmit = async e => { if (e.submitter?.value !== "save") return;
-  const d = { photo: photoData }; [...form.elements].forEach(el => { if (el.name) d[el.name] = el.value.trim(); });
-  d.id = editId || "k" + Date.now(); await store.save(d); toast("تم الحفظ ✔"); };
-$("#delKid").onclick = async () => { if (confirm("حذف هذا المخدوم نهائياً مع كل درجاته؟")) { await store.remove(editId); dlg.close(); toast("تم الحذف"); } };
+  const old = kids.find(x => x.id === editId) || {}, d = { photo: photoData }, ch = [];
+  [...form.elements].forEach(el => { if (el.name) { d[el.name] = el.value.trim(); if ((old[el.name] || "") !== d[el.name]) ch.push(el.closest("label").childNodes[0].textContent.trim()); } });
+  if ((old.photo || "") !== photoData) ch.push("الصورة");
+  if (editId && !ch.length) return;
+  d.id = editId || "k" + Date.now(); d.lastBy = userEmail; d.lastAt = Date.now();
+  await store.save(d); store.log(editId ? "edit" : "add", d, editId ? "عدّل: " + ch.join("، ") : "أضاف مخدوماً جديداً"); toast("تم الحفظ ✔"); };
+$("#delKid").onclick = async () => { if (!isHost()) return toast("الحذف للمسؤول فقط");
+  const k = kids.find(x => x.id === editId); if (!await askPw("أدخل كلمة السر لحذف «" + k.name + "»")) return;
+  if (confirm("حذف نهائي مع كل درجاته؟")) { await store.remove(editId); store.log("delete", k, "حذف المخدوم نهائياً"); dlg.close(); toast("تم الحذف"); } };
 $("#csv").onclick = () => { const rows = [["المركز", "الاسم", "النقاط", "القداس%", "التونية%", "الخدمة%", "هاتف الأب", "هاتف الأم"], ...ranked().map(k => [k.rank, k.name, k.pts, k.m, k.t, k.s, k.phoneF || "", k.phoneM || ""])];
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + rows.map(r => r.join(",")).join("\n")], { type: "text/csv" })); a.download = "sunday-school.csv"; a.click(); };
 function toast(t) { const el = $("#toast"); el.textContent = t; el.classList.add("show"); setTimeout(() => el.classList.remove("show"), 1800); }
@@ -152,3 +176,18 @@ function confetti(n) { for (let i = 0; i < n; i++) { const e = document.createEl
   document.body.append(e); setTimeout(() => e.remove(), 5000); } }
 $("#float").innerHTML = Array.from({ length: 14 }, () => `<i style="--s:${16 + Math.random() * 30}px;left:${Math.random() * 100}%;animation-duration:${14 + Math.random() * 14}s;animation-delay:-${Math.random() * 20}s">${I("cross")}</i>`).join("");
 $$(".auth-card>*").forEach((el, i) => el.style.setProperty("--n", i + 2));
+
+/* ---------- المسؤول وكلمة السر ---------- */
+function setupHost() { $("#navLog").hidden = !isHost(); $("#me").innerHTML = `<b>${esc(userEmail)}</b>${isHost() ? '<span class="badge">المسؤول</span>' : ""}`;
+  if (!isHost()) return;
+  if (LIVE) { unsubLog?.(); unsubLog = fb.onSnapshot(fb.query(fb.collection(db, "logs"), fb.orderBy("ts", "desc"), fb.limit(300)), sn => { logs = sn.docs.map(d => d.data()); renderLog(); }, () => toast("تعذر قراءة السجل — راجع قواعد Firestore")); }
+  else logs = JSON.parse(localStorage.getItem("ss_logs") || "[]"); }
+function renderLog() { if (!isHost()) return; const L = logs.filter(l => !q || (l.email + l.kid + l.detail).includes(q));
+  $("#logTop").textContent = logs[0] ? `آخر تعديل كان من ${logs[0].email} — ${when(logs[0].ts)}` : "لم تُسجَّل أي تعديلات بعد";
+  $("#logTbl").innerHTML = `<thead><tr><th>اليوم والساعة</th><th>الإيميل</th><th>المخدوم</th><th>العملية</th></tr></thead><tbody>` +
+    (L.map((l, i) => `<tr style="--i:${Math.min(i, 15)}"><td>${when(l.ts)}</td><td class="mail">${esc(l.email)}</td><td>${esc(l.kid)}</td><td class="lt ${l.type}">${esc(l.detail)}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">لا توجد نتائج</td></tr>`) + "</tbody>"; }
+function askPw(msg) { return new Promise(res => { const d = $("#pw"); $("#pwMsg").textContent = msg; $("#pwIn").value = ""; $("#pwErr").textContent = ""; d.returnValue = ""; d.showModal(); $("#pwIn").focus();
+  $("#pwForm").onsubmit = e => { if (h53($("#pwIn").value) !== PW) { e.preventDefault(); $("#pwErr").textContent = "كلمة السر غير صحيحة"; $("#pwIn").select(); } else res(true); };
+  $("#pwNo").onclick = () => d.close(); d.onclose = () => { if (d.returnValue !== "ok") res(false); }; }); }
+P.log = "M5 3h14v18H5zM8 7h8v2H8zM8 11h8v2H8zM8 15h5v2H8z";
+$$('[data-ic="log"]').forEach(el => el.innerHTML = I("log"));

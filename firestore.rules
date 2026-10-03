@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /kids/{id} {
+      allow read, create, update: if request.auth != null;
+      allow delete: if request.auth.token.email == "kerolloesatef7@gmail.com"
+                    && request.auth.token.email_verified == true;
+    }
+    match /logs/{id} {
+      allow create: if request.auth != null;
+      allow read: if request.auth.token.email == "kerolloesatef7@gmail.com"
+                  && request.auth.token.email_verified == true;
+      allow update, delete: if false;
+    }
+  }
+}
