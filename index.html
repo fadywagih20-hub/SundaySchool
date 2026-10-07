@@ -13,11 +13,12 @@
   <div class="auth-card">
     <div class="logo"><i class="ic" data-ic="cross"></i></div>
     <h1>مدارس الأحد</h1>
-<p class="verse">«هأنذا أسأل عن غنمي وأفتقدها» <small>حز ٣٤: ١١</small></p>
+    <p class="verse">«هأنذا أسأل عن غنمي وأفتقدها» <small>حز ٣٤: ١١</small></p>
     <input id="email" type="email" placeholder="البريد الإلكتروني" autocomplete="email">
     <input id="pass" type="password" placeholder="كلمة المرور (٦ أحرف على الأقل)" autocomplete="current-password">
     <button class="btn primary" id="authBtn">تسجيل الدخول</button>
     <button class="btn ghost" id="googleBtn">الدخول بحساب Google</button>
+    <a href="#" id="guideLink">كيف أستخدم الموقع؟</a>
     <a href="#" id="toggleAuth">ليس لديك حساب؟ أنشئ حساباً جديداً</a>
     <p class="err" id="authErr"></p>
     <p class="muted small" id="demoNote"></p>
@@ -33,6 +34,7 @@
       <button data-v="kids"><i class="ic" data-ic="book"></i><span>المخدومين</span></button>
       <button data-v="log" id="navLog" hidden><i class="ic" data-ic="log"></i><span>سجل النشاط</span></button>
     </nav>
+    <button id="guideBtn" class="gb"><i class="ic" data-ic="book"></i><span>دليل الاستخدام</span></button>
     <p class="me" id="me"></p>
     <p class="aside-verse">«كُلُّ شَيْءٍ يَحْسُنُ وَبِحَسَبِ تَرْتِيبٍ»</p>
     <button class="out" id="logout"><i class="ic" data-ic="out"></i><span>خروج</span></button>
@@ -44,7 +46,9 @@
         <input id="search" placeholder="بحث بالاسم">
         <select id="year"></select>
         <button class="btn primary" id="addKid">＋ ولد جديد</button>
-        <button class="btn ghost" id="csv">تصدير Excel</button>
+        <div class="xl"><button class="btn ghost" id="xlBtn"><i class="ic" data-ic="xl"></i> Excel ▾</button>
+          <div class="pop" id="xlPop" hidden><button id="xlImp">⬆ استيراد مخدومين من Excel</button><button id="xlExp">⬇ تصدير البيانات إلى Excel</button><button id="xlTpl">📄 تحميل ملف نموذج</button></div>
+          <input type="file" id="xlFile" accept=".xlsx,.xls,.csv" hidden></div>
       </div>
     </header>
     <section id="stats"></section>
@@ -89,7 +93,10 @@
   </form>
 </dialog>
 <dialog id="pw"><form method="dialog" id="pwForm" class="pwf"><h3>تأكيد الصلاحية</h3><p class="muted small" id="pwMsg"></p><input id="pwIn" type="password" placeholder="كلمة السر" autocomplete="off"><p class="err" id="pwErr"></p><div class="pwb"><button class="btn primary" value="ok">تأكيد</button><button class="btn ghost" type="button" id="pwNo">إلغاء</button></div></form></dialog>
+<dialog id="imp"><div class="dhead"><h3>استيراد من Excel</h3><button type="button" class="x" id="impClose">✕</button></div><div class="impbody"><div class="chips" id="impChips"></div><div class="implist" id="impList"></div></div><div class="dfoot"><span class="muted small">الأسماء الموجودة بالفعل بيتم تجاهلها</span><button class="btn primary" id="impGo">إضافة الجدد</button></div></dialog>
+<dialog id="guide"><div class="dhead"><h3>دليل الاستخدام</h3><button type="button" class="x" id="gClose">✕</button></div><div class="gbody" id="gBody"></div><div class="gfoot"><button class="btn ghost" id="gPrev">السابق</button><div class="dots" id="gDots"></div><button class="btn primary" id="gNext">التالي</button></div></dialog>
 <div id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script src="script.js" defer></script>
 </body>
 </html>

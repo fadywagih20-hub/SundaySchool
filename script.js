@@ -25,7 +25,8 @@ let auth, db, col, unsub, fb = {};
 const LS = "ss_kids";
 const HOST = "kerolloesatef7@gmail.com", PW = 4468333679990479;
 const h53 = (str, seed = 0) => { let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed; for (let i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507); h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507); h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909); return 4294967296 * (2097151 & h2) + (h1 >>> 0); };
-const LBL = { m: "القداس", t: "التونية", s: "الخدمة", b: "البونص" };
+const LBL = { m: "القداس", t: "التونية", s: "الخدمة", b: "البونص", v: "الافتقاد التليفوني" };
+const hk = n => "h" + year + "_" + n;
 let userEmail = "", logs = [], unsubLog;
 const me = () => LIVE ? (auth?.currentUser?.email || "") : (localStorage.getItem("ss_user") || "");
 const isHost = () => userEmail.toLowerCase() === HOST;
@@ -41,6 +42,11 @@ const store = {
     else { ((k.att ??= {})[key] ??= {})[f] = v; Object.assign(k.att[key], meta); k.lastBy = meta.by; k.lastAt = meta.at; persist(); emit(); }
     store.log("att", k, `${LBL[f]}: ${old | 0} ← ${v} (${dateLabel(key)})`);
   },
+  async setHome(id, n, v) { const k = kids.find(x => x.id === id), old = k.home?.[hk(n)]?.v ? 1 : 0; if (old == v) return;
+    const meta = { v, by: userEmail, at: Date.now() };
+    if (LIVE) await fb.setDoc(fb.doc(col, id), { home: { [hk(n)]: meta }, lastBy: meta.by, lastAt: meta.at }, { merge: true });
+    else { (k.home ??= {})[hk(n)] = meta; k.lastBy = meta.by; k.lastAt = meta.at; persist(); emit(); }
+    store.log("att", k, `الافتقاد المنزلي: الزيارة ${n} من ٣ ← ${v ? "تمت" : "أُلغيت"}`); },
   log(type, k, detail) { const e = { email: userEmail, ts: Date.now(), type, kid: k.name, kidId: k.id, detail };
     if (LIVE) fb.addDoc(fb.collection(db, "logs"), e).catch(() => {});
     else { const L = JSON.parse(localStorage.getItem("ss_logs") || "[]"); L.unshift(e); localStorage.setItem("ss_logs", JSON.stringify(L.slice(0, 500))); if (isHost()) { logs = L; renderLog(); } } }
@@ -106,15 +112,15 @@ function renderAll() {
   $("#year").innerHTML = [year - 1, year, year + 1].map(y => `<option value="${y}" ${y === year ? "selected" : ""}>${y} / ${y + 1}</option>`).join("");
   const R = ranked(), top = R[0], pr = passed().length;
   $("#stats").innerHTML = `<div class="st">المخدومين<b>${R.length}</b></div><div class="st">الجمع المسجلة<b>${pr}</b></div><div class="st">الأول حالياً<b>${top ? esc(top.name.split(" ")[0]) : "-"}</b></div><div class="st">أعياد ميلاد الشهر<b>${kids.filter(k => k.birth && new Date(k.birth).getMonth() === now.getMonth()).length}</b></div>`;
-  renderTrack(R); renderBoard(R); renderKids(R); renderLog();
+  renderTrack(R); renderBoard(R); renderKids(R); renderLog(); countUp();
 }
 function renderTrack(R) {
   const ms = svcMonths(); $("#months").innerHTML = ms.map(({ m, y }, i) => `<button class="${i === monthIdx ? "on" : ""}" data-i="${i}">${MONTHS[m]} ${y}</button>`).join("");
   const { m, y } = ms[monthIdx], F = fridays(y, m), list = filt([...kids].sort((a, b) => a.name.localeCompare(b.name, "ar")));
-  let h = `<thead><tr><th class="nm" rowspan="2">الاسم</th>${F.map(d => `<th colspan="5" class="day">${d.getDate()} ${MONTHS[m]}</th>`).join("")}<th rowspan="2">إجمالي الشهر</th></tr><tr>${F.map(() => FIELDS.map(f => `<th title="${f[3]}">${I(f[1])}</th>`).join("") + "<th>" + I("star") + "</th><th>Σ</th>").join("")}</tr></thead><tbody>`;
-  h += list.map((k, idx) => { let mt = 0; const cells = F.map(d => { const a = k.att?.[key(d)] || {}, t = dayTotal(a); mt += t;
-    return FIELDS.map(([f, ic, c]) => `<td${f === "m" ? ' class="day"' : ""}><button class="t ${c} ${a[f] ? "on" : ""}" title="${a.by ? "آخر تعديل: " + esc(a.by) + " — " + when(a.at) : ""}" data-id="${k.id}" data-k="${key(d)}" data-f="${f}">${a[f] ? 1 : 0}</button></td>`).join("") + `<td><input class="b" type="number" min="0" value="${a.b || 0}" data-id="${k.id}" data-k="${key(d)}" data-f="b"></td><td class="tot">${t}</td>`; }).join("");
-    return `<tr style="--i:${idx}"><td class="nm" data-open="${k.id}"><img class="av" src="${k.photo || AVATAR}">${esc(k.name)}</td>${cells}<td class="tot">${mt}</td></tr>`; }).join("");
+  let h = `<thead><tr><th class="nm" rowspan="2">الاسم</th>${F.map(d => `<th colspan="6" class="day">${d.getDate()} ${MONTHS[m]}</th>`).join("")}<th rowspan="2">إجمالي الشهر</th><th rowspan="2" title="افتقاد تليفوني هذا الشهر">${I("phone")} الشهر</th><th colspan="3" class="hgrp">${I("home")} افتقاد منزلي — ٣ مرات في السنة</th></tr><tr>${F.map(() => FIELDS.map(f => `<th title="${f[3]}">${I(f[1])}</th>`).join("") + "<th>" + I("star") + "</th><th>Σ</th><th>" + I("phone") + "</th>").join("") + "<th>١</th><th>٢</th><th>٣</th>"}</tr></thead><tbody>`;
+  h += list.map((k, idx) => { let mt = 0, pc = 0; const cells = F.map(d => { const a = k.att?.[key(d)] || {}, t = dayTotal(a); mt += t; pc += a.v ? 1 : 0;
+    return FIELDS.map(([f, ic, c]) => `<td${f === "m" ? ' class="day"' : ""}><button class="t ${c} ${a[f] ? "on" : ""}" title="${a.by ? "آخر تعديل: " + esc(a.by) + " — " + when(a.at) : ""}" data-id="${k.id}" data-k="${key(d)}" data-f="${f}">${a[f] ? 1 : 0}</button></td>`).join("") + `<td><input class="b" type="number" min="0" value="${a.b || 0}" data-id="${k.id}" data-k="${key(d)}" data-f="b"></td><td class="tot">${t}</td><td><button class="t ph ${a.v ? "on" : ""}" data-id="${k.id}" data-k="${key(d)}" data-f="v" title="افتقاد تليفوني">${a.v ? 1 : 0}</button></td>`; }).join("");
+    return `<tr style="--i:${idx}"><td class="nm" data-open="${k.id}"><img class="av" src="${k.photo || AVATAR}">${esc(k.name)}</td>${cells}<td class="tot">${mt}</td><td class="tot ph-c">${pc}/${F.length}</td>${[1, 2, 3].map(n => { const z = k.home?.[hk(n)]; return `<td><button class="hb ${z?.v ? "on" : ""}" data-hid="${k.id}" data-n="${n}" title="${z?.v ? "آخر تعديل: " + esc(z.by) + " — " + when(z.at) : "زيارة منزلية " + n + " من ٣"}">${z?.v ? "✓" : ""}</button></td>`; }).join("")}</tr>`; }).join("");
   $("#tbl").innerHTML = h + (list.length ? "" : `<tr><td colspan="9" class="muted">لا يوجد مخدومين — اضغط «ولد جديد»</td></tr>`) + "</tbody>";
 }
 function renderBoard(R) {
@@ -129,6 +135,8 @@ function renderKids(R) {
 
 /* ---------- التفاعلات ---------- */
 document.addEventListener("click", e => {
+  const hb = e.target.closest(".hb"); if (hb) store.setHome(hb.dataset.hid, +hb.dataset.n, kids.find(x => x.id === hb.dataset.hid).home?.[hk(+hb.dataset.n)]?.v ? 0 : 1);
+  if (!e.target.closest(".xl")) $("#xlPop").hidden = true;
   const t = e.target.closest(".t"); if (t) { const k = kids.find(x => x.id === t.dataset.id); store.setAtt(k.id, t.dataset.k, t.dataset.f, k.att?.[t.dataset.k]?.[t.dataset.f] ? 0 : 1); }
   const mb = e.target.closest("[data-i]"); if (mb) { monthIdx = +mb.dataset.i; renderAll(); play($("#v-track")); }
   const o = e.target.closest("[data-open]"); if (o && (e.detail === 2 || o.classList.contains("kc") || o.closest("#rank"))) openKid(o.dataset.open);
@@ -161,15 +169,13 @@ form.onsubmit = async e => { if (e.submitter?.value !== "save") return;
 $("#delKid").onclick = async () => { if (!isHost()) return toast("الحذف للمسؤول فقط");
   const k = kids.find(x => x.id === editId); if (!await askPw("أدخل كلمة السر لحذف «" + k.name + "»")) return;
   if (confirm("حذف نهائي مع كل درجاته؟")) { await store.remove(editId); store.log("delete", k, "حذف المخدوم نهائياً"); dlg.close(); toast("تم الحذف"); } };
-$("#csv").onclick = () => { const rows = [["المركز", "الاسم", "النقاط", "القداس%", "التونية%", "الخدمة%", "هاتف الأب", "هاتف الأم"], ...ranked().map(k => [k.rank, k.name, k.pts, k.m, k.t, k.s, k.phoneF || "", k.phoneM || ""])];
-  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + rows.map(r => r.join(",")).join("\n")], { type: "text/csv" })); a.download = "sunday-school.csv"; a.click(); };
 function toast(t) { const el = $("#toast"); el.textContent = t; el.classList.add("show"); setTimeout(() => el.classList.remove("show"), 1800); }
 
 /* ---------- أيقونات وتأثيرات ---------- */
 const P = { cross: "M9.5 1h5v8.5H23v5h-8.5V23h-5v-8.5H1v-5h8.5z", church: "M11 1h2v2h2v2h-2v2.2l6 3.3V22H4V10.5l6-3.3V5H9V3h2zM10 22h4v-6a2 2 0 00-4 0z", tunic: "M8 3l4 2.5L16 3l5 4-2.5 3.5L17 9.5V22H7V9.5l-1.5 1L3 7z", book: "M4 3h7.5v17H5a1 1 0 01-1-1zM12.5 3H20v16a1 1 0 01-1 1h-6.5z", star: "M12 2l3 6.5 7 .9-5.1 4.8 1.3 7-6.2-3.4-6.2 3.4 1.3-7L2 9.4l7-.9z", crown: "M2 7l5 4 5-7 5 7 5-4-2 12H4z", out: "M4 3h9v3H7v12h6v3H4zM16 8l5 4-5 4v-3H10v-2h6z" };
 function I(n) { return `<svg class="svg" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="${P[n]}"/></svg>`; }
 $$("[data-ic]").forEach(el => el.innerHTML = I(el.dataset.ic));
-$("#legend").innerHTML = FIELDS.map(f => `<span class="lg">${I(f[1])} ${f[3]}</span>`).join("") + `<span>${I("star")} بونص</span><span>اضغط الخانة للتبديل • انقر مرتين على الاسم لفتح البطاقة</span>`;
+$("#legend").innerHTML = FIELDS.map(f => `<span class="lg">${I(f[1])} ${f[3]}</span>`).join("") + `<span>${I("star")} بونص</span><span>${I("phone")} افتقاد تليفوني (كل أسبوع)</span><span>${I("home")} افتقاد منزلي (٣ مرات في السنة)</span><span>اضغط الخانة للتبديل • انقر مرتين على الاسم لفتح البطاقة</span>`;
 function play(el) { el.classList.remove("anim"); void el.offsetWidth; el.classList.add("anim"); setTimeout(() => el.classList.remove("anim"), 1500); }
 function confetti(n) { for (let i = 0; i < n; i++) { const e = document.createElement("i"); e.className = "conf"; e.innerHTML = I(i % 3 ? "cross" : "star");
   e.style.cssText = `left:${Math.random() * 100}vw;--s:${10 + Math.random() * 14}px;--c:${["#d9ab4e", "#f1d38a", "#f3ecd9", "#a32a4b"][i % 4]};--d:${2 + Math.random() * 2}s;--x:${Math.random() * 160 - 80}px;--r:${Math.random() * 720}deg;animation-delay:${Math.random() * .6}s;width:1em;height:1em`;
@@ -191,3 +197,72 @@ function askPw(msg) { return new Promise(res => { const d = $("#pw"); $("#pwMsg"
   $("#pwNo").onclick = () => d.close(); d.onclose = () => { if (d.returnValue !== "ok") res(false); }; }); }
 P.log = "M5 3h14v18H5zM8 7h8v2H8zM8 11h8v2H8zM8 15h5v2H8z";
 $$('[data-ic="log"]').forEach(el => el.innerHTML = I("log"));
+
+/* ---------- دليل الاستخدام داخل الموقع ---------- */
+const GUIDE = [
+  ["cross", "أهلاً بيك في خدمة مدارس الأحد", ["الموقع بديل كشكول الغياب الورقي.", "بتسجّل الحضور والبونص، والترتيب بيتحسب لوحده.", "كل الخدام بيشوفوا نفس البيانات في نفس اللحظة."]],
+  ["book", "١ — إنشاء حساب وتسجيل الدخول", ["من صفحة الدخول اضغط «أنشئ حساباً جديداً» واكتب بريدك وكلمة مرور ٦ أحرف على الأقل.", "أو اضغط «الدخول بحساب Google» وهتدخل على طول.", "المرات الجاية سجّل دخولك بنفس البيانات."]],
+  ["church", "٢ — المتابعة الأسبوعية", ["اختار الشهر من فوق، هتلاقي جمعاته الحقيقية بالتاريخ.", "قدام كل ولد أربع خانات: القداس، التونية، الخدمة بالضغط (١ حضر، ٠ غاب)، والبونص برقم.", "على الشمال مجموع اليوم ومجموع الشهر."]],
+  ["star", "٣ — نظام النقط", ["مجموع اليوم = القداس + التونية + الخدمة (٣ درجات) + البونص.", "البونص تقدير للتفاعل والشطارة والسلوك الهادئ، وممكن يبقى نقطة أو أكتر.", "النسب بتتحسب من الجمع اللي عدّت لحد النهاردة."]],
+  ["phone", "٣-ب — الافتقاد", ["الافتقاد التليفوني: خانة في كل أسبوع بعد البونص، اضغطها لو كلمت الولد (يعني ٤ مرات في الشهر).", "الافتقاد المنزلي: ٣ مربعات فاضية في آخر الصف، تعلّم كل مرة تزور فيها الولد خلال السنة كلها.", "الافتقاد منفصل تماماً عن النقط ولوحة الشرف والترتيب."]],
+  ["crown", "٤ — لوحة الشرف", ["الترتيب بيتحدث فوراً مع أي تعديل في المتابعة.", "أول ثلاثة على المنصة، والأول بتاج ذهبي.", "الجدول فيه النقاط ونسب القداس والتونية والخدمة."]],
+  ["book", "٥ — بطاقة المخدوم: إضافة وتعديل", ["للإضافة اضغط «＋ ولد جديد» واكتب كلمة السر، واملا البطاقة واضغط «حفظ».", "للتعديل اضغط مرتين على الاسم في المتابعة، أو اضغط كارته في تبويب «المخدومين».", "البطاقة فيها الاسم الرباعي والعنوان وتليفونات الأسرة ووظائف الأهل والأخوات وآباء الاعتراف والملاحظات والصورة."]],
+  ["cross", "٦ — الحذف وكلمة السر", ["إضافة أي ولد محتاجة كلمة السر.", "الحذف للمسؤول فقط، وبعد كلمة السر وتأكيد نهائي.", "الحذف بيمسح الولد وكل درجاته، فاتأكد قبلها."]],
+  ["log", "٧ — المسؤول وسجل النشاط", ["المسؤول بيظهر له تبويب «سجل النشاط» وشارة «المسؤول».", "السجل بيعرض مين عدّل، وإيميله، واليوم والساعة، وإيه اللي اتغيّر.", "ولو وقفت على أي خانة حضور بتشوف آخر من عدّلها."]],
+  ["star", "٨ — الاستيراد والتصدير من Excel", ["من زرار «Excel» فوق: حمّل «ملف نموذج»، واملا بيانات الأولاد فيه.", "اختار «استيراد»: الموقع بيضيف الأسماء الجديدة بس ويتجاهل الموجودين بالفعل، بعد كلمة السر.", "«تصدير» بينزّل ملف فيه بيانات كل المخدومين وصفحة تانية بالترتيب والنقاط."]],
+  ["star", "٩ — أعياد الميلاد وإضافات", ["فوق الصفحة خانة بتعدّ مواليد الشهر الحالي من تاريخ الميلاد في البطاقة.", "في بحث بالاسم، وزرار «تصدير Excel» لملف فيه الترتيب والنسب.", "اختار السنة الخدمية من القايمة، والموقع بيشتغل على الموبايل."]]
+];
+let gi = 0;
+function gShow(n) { const dir = n >= gi ? 1 : -1; gi = Math.max(0, Math.min(GUIDE.length - 1, n)); const [ic, t, L] = GUIDE[gi];
+  $("#gBody").innerHTML = `<div class="gs" style="--d:${dir}"><div class="gic">${I(ic)}</div><h3>${t}</h3><ul>${L.map(x => `<li>${x}</li>`).join("")}</ul></div>`;
+  $("#gDots").innerHTML = GUIDE.map((_, i) => `<i class="${i === gi ? "on" : ""}" data-g="${i}"></i>`).join("");
+  $("#gPrev").disabled = gi === 0; $("#gNext").textContent = gi === GUIDE.length - 1 ? "إنهاء" : "التالي"; }
+const openGuide = e => { e?.preventDefault(); gi = 0; gShow(0); $("#guide").showModal(); };
+$("#guideBtn").onclick = openGuide; $("#guideLink").onclick = openGuide;
+$("#gClose").onclick = () => $("#guide").close();
+$("#gPrev").onclick = () => gShow(gi - 1);
+$("#gNext").onclick = () => gi === GUIDE.length - 1 ? $("#guide").close() : gShow(gi + 1);
+$("#gDots").onclick = e => { if (e.target.dataset.g) gShow(+e.target.dataset.g); };
+$("#guide").addEventListener("keydown", e => { if (e.key === "ArrowLeft") $("#gNext").click(); if (e.key === "ArrowRight") $("#gPrev").click(); });
+$$('[data-ic="book"]').forEach(el => el.innerHTML = I("book"));
+
+/* ---------- الافتقاد: أيقونات + تأثيرات ---------- */
+Object.assign(P, { phone: "M6.6 10.8a15 15 0 006.6 6.6l2.2-2.2a1 1 0 011-.25c1.1.37 2.3.57 3.6.57a1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.3.2 2.5.57 3.6a1 1 0 01-.25 1z", home: "M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z", xl: "M5 3h9l5 5v13H5zM13 3v6h6M8 12l5 7M13 12l-5 7" });
+$$('[data-ic="xl"]').forEach(el => el.innerHTML = I("xl"));
+document.addEventListener("pointerdown", e => { const b = e.target.closest(".btn,.t,.hb,.months button"); if (!b) return; const r = b.getBoundingClientRect(), i = document.createElement("i"), d = Math.max(r.width, r.height) * 2;
+  i.className = "rip"; i.style.cssText = `width:${d}px;height:${d}px;left:${e.clientX - r.left - d / 2}px;top:${e.clientY - r.top - d / 2}px`; b.append(i); setTimeout(() => i.remove(), 600); });
+const _ps = [];
+function countUp() { $$("#stats .st b").forEach((b, i) => { const v = +b.textContent; if (isNaN(v)) return; const from = _ps[i] ?? 0; _ps[i] = v; if (from === v) return; const t0 = performance.now();
+  (function f(t) { const p = Math.min((t - t0) / 800, 1); b.textContent = Math.round(from + (v - from) * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(f); })(t0); }); }
+
+/* ---------- Excel: استيراد وتصدير ---------- */
+const COLS = [["name", "الاسم رباعي"], ["birth", "تاريخ الميلاد"], ["grade", "السنة الدراسية"], ["address", "العنوان"], ["phoneS", "تليفون الولد"], ["phoneF", "تليفون الأب"], ["phoneM", "تليفون الأم"], ["jobF", "وظيفة الأب"], ["jobM", "وظيفة الأم"], ["siblings", "الأخوات"], ["siblingsBirth", "تواريخ ميلاد الأخوات"], ["confS", "أب اعتراف الولد"], ["confF", "أب اعتراف الأب"], ["confM", "أب اعتراف الأم"], ["notes", "ملاحظات"]];
+const norm = s => String(s ?? "").replace(/[\u064B-\u065F\u0670]/g, "").replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/\s+/g, " ").trim();
+const fixDate = v => { if (v instanceof Date) { const d = new Date(v.getTime() + 43200000); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`; }
+  const t = String(v ?? "").trim(), m = t.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/); return m ? `${m[3]}-${pad(m[2])}-${pad(m[1])}` : (/^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : ""); };
+let pending = [];
+const needX = () => window.XLSX ? true : (toast("تعذر تحميل مكتبة Excel — تأكد من الإنترنت"), false);
+$("#xlBtn").onclick = e => { e.stopPropagation(); $("#xlPop").hidden = !$("#xlPop").hidden; };
+$("#xlImp").onclick = () => { $("#xlPop").hidden = true; $("#xlFile").click(); };
+$("#xlTpl").onclick = () => { $("#xlPop").hidden = true; if (!needX()) return; const ws = XLSX.utils.aoa_to_sheet([COLS.map(c => c[1]), ["مثال: مينا رامز عادل جرجس", "2015-10-03", "الصف الخامس", "المنيا", "0100000000", "0101111111", "0102222222", "مهندس", "معلمة", "مريم", "2012-03-12", "أبونا بيشوي", "", "", ""]]);
+  ws["!cols"] = COLS.map(() => ({ wch: 22 })); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "المخدومين"); wb.Workbook = { Views: [{ RTL: true }] }; XLSX.writeFile(wb, "نموذج-استيراد-المخدومين.xlsx"); };
+$("#xlExp").onclick = () => { $("#xlPop").hidden = true; if (!needX()) return;
+  const data = kids.map(k => Object.fromEntries(COLS.map(([f, l]) => [l, k[f] || ""])));
+  const rank = ranked().map(k => ({ "المركز": k.rank, "الاسم": k.name, "النقاط": k.pts, "القداس %": k.m, "التونية %": k.t, "الخدمة %": k.s }));
+  const w1 = XLSX.utils.json_to_sheet(data), w2 = XLSX.utils.json_to_sheet(rank); w1["!cols"] = COLS.map(c => ({ wch: Math.max(16, c[1].length + 4) })); w1["!cols"][0] = { wch: 30 }; w2["!cols"] = [{ wch: 8 }, { wch: 30 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, w1, "بيانات المخدومين"); XLSX.utils.book_append_sheet(wb, w2, "الترتيب والنقاط"); wb.Workbook = { Views: [{ RTL: true }] };
+  XLSX.writeFile(wb, "بيانات-مدارس-الأحد-" + new Date().toISOString().slice(0, 10) + ".xlsx"); toast("تم تصدير الملف ✔"); };
+$("#xlFile").onchange = async e => { const f = e.target.files[0]; e.target.value = ""; if (!f || !needX()) return;
+  const wb = XLSX.read(await f.arrayBuffer(), { type: "array", cellDates: true }), rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" }), map = {};
+  Object.keys(rows[0] || {}).forEach(h => { const n = norm(h), c = COLS.find(c => norm(c[1]) === n || (c[0] === "name" && n === "الاسم")); if (c) map[h] = c[0]; });
+  if (!Object.values(map).includes("name")) return toast("مفيش عمود «الاسم رباعي» في الملف");
+  const have = new Set(kids.map(k => norm(k.name))), seen = new Set(), fresh = []; let dup = 0;
+  rows.forEach(r => { const d = {}; for (const h in map) d[map[h]] = map[h] === "birth" ? fixDate(r[h]) : String(r[h] ?? "").trim(); if (!d.name) return; const n = norm(d.name); if (have.has(n) || seen.has(n)) dup++; else { seen.add(n); fresh.push(d); } });
+  pending = fresh; $("#impChips").innerHTML = `<span class="chip ok">جديد: ${fresh.length}</span><span class="chip">موجود بالفعل (هيتجاهل): ${dup}</span>`;
+  $("#impList").innerHTML = fresh.map((d, i) => `<div style="--i:${Math.min(i, 20)}">${esc(d.name)}</div>`).join("") || '<p class="muted">مفيش أسماء جديدة في الملف.</p>';
+  $("#impGo").disabled = !fresh.length; $("#imp").showModal(); };
+$("#impClose").onclick = () => $("#imp").close();
+$("#impGo").onclick = async () => { if (!(await askPw("إضافة " + pending.length + " مخدوم جديد من Excel تحتاج كلمة السر"))) return;
+  const t = Date.now(); await Promise.all(pending.map((d, i) => store.save({ ...d, id: "k" + t + "_" + i, lastBy: userEmail, lastAt: t })));
+  store.log("add", { name: "استيراد Excel", id: "import" }, `استورد ${pending.length} مخدوم جديد: ` + pending.slice(0, 5).map(d => d.name).join("، ") + (pending.length > 5 ? " …" : ""));
+  $("#imp").close(); toast(`تمت إضافة ${pending.length} ✔`); confetti(16); };
